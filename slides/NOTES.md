@@ -30,3 +30,9 @@ Keep the agent window ready before you start. Press Enter at 0:00, switch to sli
 1. `./scripts/preflight.sh`
 2. `./scripts/talk.sh`, do the whole thing with a timer.
 3. Leave the resulting PR open as the fallback. Then `./scripts/reset.sh` **only on the morning after you have a second one**, or keep that PR and start the live one on a new branch (the script always creates a new branch, so both can exist).
+
+## Verified on 16 Oct
+
+- Three dry runs with `claude -p` (Sonnet 5.5) in a throwaway worktree. The third one, with the allowlist and repo trust in place, finished in 103 s: Event.ID dedup, `TestCorrectionBooksAgain`, `Book.Reverse` with reversal batches, AGENTS.md updated, tests green.
+- First two runs stalled on permission prompts. That is why `demo/.claude/settings.json` has an allowlist and why `preflight.sh` checks that the repo is trusted.
+- Codex is not installed on this machine. `AGENT=codex ./scripts/live-agent.sh` is wired but untested. Rehearse with Claude unless you install and test Codex first.
