@@ -1,4 +1,4 @@
-Two things, in one PR, on a new branch.
+Two things, in one PR. You are already on a fresh branch; do not create another.
 
 1. Bug: trade corrections are dropped. `go run ./cmd/booking-service` publishes
    evt-003, a correction for trade T-1, and it never appears in the book.

@@ -9,6 +9,7 @@ command -v slides >/dev/null && ok "slides installed" || bad "slides missing: br
 command -v tmux   >/dev/null && ok "tmux installed"   || bad "tmux missing: brew install tmux"
 command -v claude >/dev/null && ok "claude installed" || bad "claude missing"
 gh auth status >/dev/null 2>&1 && ok "gh authenticated" || bad "gh not logged in: gh auth login"
+ROOT="$(pwd)"; [ "$(jq -r --arg p "$ROOT" '.projects[$p].hasTrustDialogAccepted // false' ~/.claude.json)" = true ] && ok "repo trusted by Claude Code (allowlist active)" || bad "repo not trusted: run 'claude' in demo/ once and accept the trust dialog"
 git -C demo remote get-url origin >/dev/null 2>&1 && ok "origin remote set" || bad "no origin remote: gh repo create"
 [ "$(git branch --show-current)" = main ] && ok "on main" || bad "not on main"
 git diff --quiet && git diff --cached --quiet && ok "working tree clean" || bad "uncommitted changes"
