@@ -20,8 +20,15 @@ const Topic = "trades"
 
 // Event types this service understands.
 const (
-	TypeTradeExecuted = "TradeExecuted"
+	TypeTradeExecuted  = "TradeExecuted"
+	TypeTradeCancelled = "TradeCancelled"
 )
+
+// TradeCancelled is the payload of a TypeTradeCancelled event. It undoes every
+// batch booked for TradeID, by posting reversals.
+type TradeCancelled struct {
+	TradeID string `json:"trade_id"`
+}
 
 // TradeExecuted is the payload of a TypeTradeExecuted event.
 // A trade correction re-emits the same TradeID with a new event ID.
@@ -41,12 +48,22 @@ type Service struct {
 	book *ledger.Book
 
 	mu   sync.Mutex
-	seen map[string]ledger.PrimanotaID // idempotency: processed events -> their batch
+	seen map[string]ledger.PrimanotaID // idempotency: processed event IDs -> their batch
+	// trades maps a trade to the batches that booked it, in posting order.
+	trades map[string][]ledger.PrimanotaID
+	// reversed holds batches that already have a reversal, so a retried
+	// cancellation never reverses twice.
+	reversed map[ledger.PrimanotaID]bool
 }
 
 // New wires a service to a book.
 func New(book *ledger.Book) *Service {
-	return &Service{book: book, seen: map[string]ledger.PrimanotaID{}}
+	return &Service{
+		book:     book,
+		seen:     map[string]ledger.PrimanotaID{},
+		trades:   map[string][]ledger.PrimanotaID{},
+		reversed: map[ledger.PrimanotaID]bool{},
+	}
 }
 
 // Handle dispatches one event by type. Unknown types are skipped, not failed,
@@ -55,6 +72,8 @@ func (s *Service) Handle(ctx context.Context, evt events.Event) error {
 	switch evt.Type {
 	case TypeTradeExecuted:
 		return s.handleTradeExecuted(ctx, evt)
+	case TypeTradeCancelled:
+		return s.handleTradeCancelled(ctx, evt)
 	default:
 		return nil
 	}
@@ -68,7 +87,7 @@ func (s *Service) handleTradeExecuted(_ context.Context, evt events.Event) error
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, done := s.seen[t.TradeID]; done {
+	if _, done := s.seen[evt.ID]; done {
 		return nil
 	}
 
@@ -80,7 +99,50 @@ func (s *Service) handleTradeExecuted(_ context.Context, evt events.Event) error
 	if err != nil {
 		return fmt.Errorf("booking: post %s: %w", evt.ID, err)
 	}
-	s.seen[t.TradeID] = pn
+	s.seen[evt.ID] = pn
+	s.trades[t.TradeID] = append(s.trades[t.TradeID], pn)
+	return nil
+}
+
+// handleTradeCancelled reverses every live batch of the trade. Each reversal is
+// a new batch; past entries are never changed. A cancel for an unknown trade
+// books nothing.
+func (s *Service) handleTradeCancelled(_ context.Context, evt events.Event) error {
+	var c TradeCancelled
+	if err := json.Unmarshal(evt.Payload, &c); err != nil {
+		return fmt.Errorf("booking: decode %s: %w", evt.ID, err)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, done := s.seen[evt.ID]; done {
+		return nil
+	}
+
+	var last ledger.PrimanotaID
+	for _, orig := range s.trades[c.TradeID] {
+		if s.reversed[orig] {
+			continue
+		}
+		batch, err := s.book.Batch(orig)
+		if err != nil {
+			return fmt.Errorf("booking: cancel %s: %w", evt.ID, err)
+		}
+		rev := make([]ledger.Entry, len(batch))
+		for i, e := range batch {
+			rev[i] = ledger.Entry{
+				Debit: e.Credit, Credit: e.Debit, Amount: e.Amount, Currency: e.Currency,
+				Memo: "reversal of " + string(orig) + " (cancel " + c.TradeID + ")",
+			}
+		}
+		pn, err := s.book.Post(rev...)
+		if err != nil {
+			return fmt.Errorf("booking: post %s: %w", evt.ID, err)
+		}
+		s.reversed[orig] = true
+		last = pn
+	}
+	s.seen[evt.ID] = last
 	return nil
 }
 

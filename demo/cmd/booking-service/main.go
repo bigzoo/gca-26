@@ -29,6 +29,8 @@ func main() {
 	publish(bus, "evt-001", booking.TradeExecuted{TradeID: "T-1", Account: "acc-1", Instrument: "SAF", Side: "BUY", Quantity: d("100"), Price: d("18.50"), Fee: d("9.25"), Currency: "KES"})
 	publish(bus, "evt-002", booking.TradeExecuted{TradeID: "T-2", Account: "acc-1", Instrument: "KCB", Side: "BUY", Quantity: d("40"), Price: d("42.00"), Fee: d("8.40"), Currency: "KES"})
 	publish(bus, "evt-003", booking.TradeExecuted{TradeID: "T-1", Account: "acc-1", Instrument: "SAF", Side: "SELL", Quantity: d("30"), Price: d("19.10"), Fee: d("2.87"), Currency: "KES"})
+	cancel, _ := json.Marshal(booking.TradeCancelled{TradeID: "T-2"})
+	bus.Publish(booking.Topic, events.Event{ID: "evt-004", Type: booking.TypeTradeCancelled, Key: "acc-1", Payload: cancel})
 
 	must(bus.Consume(ctx, booking.Topic, 0, svc.Handle))
 	fmt.Println("consumed", bus.Len(booking.Topic), "events; replaying topic (simulated rebalance)...")
