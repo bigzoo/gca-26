@@ -11,7 +11,7 @@ Keep the agent window ready before you start. Press Enter at 0:00, switch to sli
 | 4:30 | 5 Proposal | Root file: 20 lines. Rules next to the code. Nested CLAUDE.md loads only when the agent touches that directory. Each invariant names its test. |
 | 5:30 | 6 Artifact | Pause here. "This is the slide to photograph." Point at B3 and B4. Invariants, not architecture. |
 | 6:30 | 7 Proof | ctrl+e on both blocks. Tests green. Run output: evt-003 is missing. "That is the bug the agent got at 0:00." |
-| 7:30 | 8 Three rules | Read them. One sentence each. |
+| 7:30 | 8 Three rules | Read them. One sentence each. On rule 1 add: "and write them in Simplified Technical English. Agents love to overspecify. Mine did, until the root file told it not to." |
 | 8:30 | 9 The PR | ctrl+e: PR title, URL, diff stat. Check three things out loud: Event.ID dedup, TestCorrectionBooksAgain, reversal not delete. "I read the invariants list in the PR body, not the diff." |
 | 9:30 | 10 Close | Generation is cheap; written-down correctness is scarce. Repo link. Asante sana. |
 

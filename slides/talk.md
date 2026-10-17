@@ -117,6 +117,7 @@ A new invariant gets a numbered line here and a test with a matching comment.
 ```
 
 Invariants, not architecture. Failure contracts, not file trees.
+Written in **Simplified Technical English**: one rule per sentence, one meaning per word, under 20 words.
 
 ---
 
@@ -141,8 +142,9 @@ cd ../demo && go run ./cmd/booking-service | sed -n '3,9p'
 
 # If you only remember three things
 
-1. **Write down invariants, not architecture.**
+1. **Write down invariants, not architecture. Write them in STE.**
    The code already says what it is. Only you know what it must never do.
+   Simplified Technical English keeps a rule to one short sentence. Agents that write these files overspecify; a style rule stops them.
 
 2. **Put the verification where the agent will run it.**
    Every invariant names a test. `go test ./...` is the review.

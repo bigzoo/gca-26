@@ -15,6 +15,11 @@ This file is deliberately short. Each package owns its invariants:
 
 Open the AGENTS.md next to the code you change. Do not copy its content here.
 
+## How to write a rule
+
+Use Simplified Technical English. One rule per sentence. One meaning per word. Under 20 words.
+Say what must never happen and which test proves it. Do not explain the architecture; the code does that.
+
 ## Definition of done
 
 1. `go build ./... && go vet ./... && go test ./...` pass.
