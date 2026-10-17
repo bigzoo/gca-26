@@ -1,6 +1,7 @@
 // Command booking-service runs the demo end to end: it publishes a few trade
-// events, consumes them, replays the topic once (as a rebalance would), and
-// prints the resulting book and balances.
+// events (one of them a correction, one a cancellation), consumes them,
+// replays the topic once (as a rebalance would), and prints the resulting
+// book and balances.
 package main
 
 import (
@@ -28,7 +29,8 @@ func main() {
 
 	publish(bus, "evt-001", booking.TradeExecuted{TradeID: "T-1", Account: "acc-1", Instrument: "SAF", Side: "BUY", Quantity: d("100"), Price: d("18.50"), Fee: d("9.25"), Currency: "KES"})
 	publish(bus, "evt-002", booking.TradeExecuted{TradeID: "T-2", Account: "acc-1", Instrument: "KCB", Side: "BUY", Quantity: d("40"), Price: d("42.00"), Fee: d("8.40"), Currency: "KES"})
-	publish(bus, "evt-003", booking.TradeExecuted{TradeID: "T-1", Account: "acc-1", Instrument: "SAF", Side: "SELL", Quantity: d("30"), Price: d("19.10"), Fee: d("2.87"), Currency: "KES"})
+	publish(bus, "evt-003", booking.TradeExecuted{TradeID: "T-1", Account: "acc-1", Instrument: "SAF", Side: "SELL", Quantity: d("30"), Price: d("19.10"), Fee: d("2.87"), Currency: "KES"}) // correction of T-1
+	publishCancel(bus, "evt-004", "acc-1", booking.TradeCancelled{TradeID: "T-2"})
 
 	must(bus.Consume(ctx, booking.Topic, 0, svc.Handle))
 	fmt.Println("consumed", bus.Len(booking.Topic), "events; replaying topic (simulated rebalance)...")
@@ -53,6 +55,11 @@ func main() {
 func publish(bus *events.Bus, id string, t booking.TradeExecuted) {
 	p, _ := json.Marshal(t)
 	bus.Publish(booking.Topic, events.Event{ID: id, Type: booking.TypeTradeExecuted, Key: t.Account, Payload: p})
+}
+
+func publishCancel(bus *events.Bus, id, account string, c booking.TradeCancelled) {
+	p, _ := json.Marshal(c)
+	bus.Publish(booking.Topic, events.Event{ID: id, Type: booking.TypeTradeCancelled, Key: account, Payload: p})
 }
 
 func d(s string) decimal.Decimal { return decimal.RequireFromString(s) }

@@ -100,6 +100,27 @@ func (b *Book) Batch(id PrimanotaID) ([]Entry, error) {
 	return out, nil
 }
 
+// Reverse undoes the batch id by posting a new batch under a new primanota.
+// The new batch has the same entries with debit and credit swapped, and every
+// Memo names the original primanota. The original entries are never touched.
+func (b *Book) Reverse(id PrimanotaID) (PrimanotaID, error) {
+	orig, err := b.Batch(id)
+	if err != nil {
+		return "", err
+	}
+	rev := make([]Entry, 0, len(orig))
+	for _, e := range orig {
+		rev = append(rev, Entry{
+			Debit:    e.Credit,
+			Credit:   e.Debit,
+			Amount:   e.Amount,
+			Currency: e.Currency,
+			Memo:     fmt.Sprintf("reverse %s: %s", id, e.Memo),
+		})
+	}
+	return b.Post(rev...)
+}
+
 // Balance is debits minus credits for one account in one currency, i.e. the
 // asset view: cash you hold is positive, cash you paid out is negative.
 func (b *Book) Balance(acct AccountID, currency string) decimal.Decimal {

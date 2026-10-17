@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -53,7 +54,7 @@ func TestDecimalIsExact(t *testing.T) {
 	}
 }
 
-// Invariant L4: primanota IDs are monotonic and unique.
+// Invariant L5: primanota IDs are monotonic and unique.
 func TestPrimanotaIsMonotonic(t *testing.T) {
 	b := New()
 	var last PrimanotaID
@@ -63,5 +64,63 @@ func TestPrimanotaIsMonotonic(t *testing.T) {
 			t.Fatalf("not monotonic: %s after %s", id, last)
 		}
 		last = id
+	}
+}
+
+// Invariant L4: the book is append-only. Reverse undoes a batch with a new
+// batch that swaps debit and credit and names the original primanota. The
+// original entries are untouched and the book still balances to zero.
+func TestReversalUndoesBatch(t *testing.T) {
+	b := New()
+	orig, err := b.Post(
+		Entry{Debit: "sec:a:AAPL", Credit: "cash:a:EUR", Amount: amt("150.25"), Currency: "EUR", Memo: "buy"},
+		Entry{Debit: "fees:house:EUR", Credit: "cash:a:EUR", Amount: amt("0.15"), Currency: "EUR", Memo: "fee"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := b.Entries()
+
+	rev, err := b.Reverse(orig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev <= orig {
+		t.Fatalf("reversal %s must get a new, later primanota than %s", rev, orig)
+	}
+
+	after := b.Entries()
+	if len(after) != 2*len(before) {
+		t.Fatalf("want %d entries after reversal, got %d", 2*len(before), len(after))
+	}
+	for i, e := range before {
+		got := after[i]
+		if got.Primanota != e.Primanota || got.Debit != e.Debit || got.Credit != e.Credit ||
+			!got.Amount.Equal(e.Amount) || got.Currency != e.Currency || got.Memo != e.Memo {
+			t.Fatalf("original entry %d was mutated: %+v -> %+v", i, e, got)
+		}
+	}
+
+	revEntries, err := b.Batch(rev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, e := range revEntries {
+		if e.Debit != before[i].Credit || e.Credit != before[i].Debit || !e.Amount.Equal(before[i].Amount) {
+			t.Fatalf("reversal entry %d is not the swap of the original: %+v", i, e)
+		}
+		if !strings.Contains(e.Memo, string(orig)) {
+			t.Fatalf("reversal memo %q does not name original primanota %s", e.Memo, orig)
+		}
+	}
+
+	for _, acct := range []AccountID{"sec:a:AAPL", "cash:a:EUR", "fees:house:EUR"} {
+		if got := b.Balance(acct, "EUR"); !got.IsZero() {
+			t.Fatalf("%s = %s after reversal, want 0", acct, got)
+		}
+	}
+
+	if _, err := b.Reverse("PN-999999"); !errors.Is(err, ErrUnknownBatch) {
+		t.Fatalf("want ErrUnknownBatch for unknown primanota, got %v", err)
 	}
 }
